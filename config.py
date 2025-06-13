@@ -3,11 +3,12 @@ import subprocess
 import warnings
 from pathlib import Path
 import os
+import time
 warnings.filterwarnings("ignore")
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-
+HOME = Path.home()
 
 def which(cmd):
     try:
@@ -47,8 +48,8 @@ def eval_pkg_latex():
 
 
     # copy the install script to ~/
-    os.system(f"cp -rf {latex_sh} ~/latex.install")
-    os.system("chmod +x ~/latex.install")
+    os.system(f"cp -rf {latex_sh} {HOME}/latex.install")
+    os.system(f"chmod +x {HOME}/latex.install")
 
 
 
@@ -56,6 +57,8 @@ def eval_pkg_latex():
 
     cmd = f"nohup bash -c {latex_sh} > {state_file} 2>&1 & echo $! > {pid_file}"
     os.system(cmd)
+    
+    time.sleep(5)  # Wait a moment to ensure the PID file is created
 
     with open(pid_file, "r") as f:
         pid_code = f.read().strip()
