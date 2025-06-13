@@ -1,4 +1,3 @@
-import stat
 import subprocess
 import warnings
 from pathlib import Path
@@ -51,11 +50,13 @@ def eval_pkg_latex():
     os.system(f"cp -rf {latex_sh} {HOME}/latex.install")
     os.system(f"chmod +x {HOME}/latex.install")
 
+    run_latex_install = HOME / "latex.install"
+
 
 
     # Construct and run the command
 
-    cmd = f"nohup bash -c {latex_sh} > {state_file} 2>&1 & echo $! > {pid_file}"
+    cmd = f"nohup bash -c {run_latex_install} > {state_file} 2>&1 & echo $! > {pid_file}"
     os.system(cmd)
     
     time.sleep(5)  # Wait a moment to ensure the PID file is created
