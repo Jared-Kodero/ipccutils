@@ -2,7 +2,7 @@ import stat
 import subprocess
 import warnings
 from pathlib import Path
-
+import os
 warnings.filterwarnings("ignore")
 
 
@@ -45,28 +45,21 @@ def eval_pkg_latex():
 
     # Make the install script executable
 
-    mode = latex_sh.stat().st_mode
-    latex_sh.chmod(mode | stat.S_IXUSR)
+
+    # copy the install script to ~/
+    os.system(f"cp -rf {latex_sh} ~/latex.install")
+    os.system("chmod +x ~/latex.install")
+
+
 
     # Construct and run the command
-    try:
-        with open(pid_file, "w") as f_pid, open(state_file, "w") as f_state:
-            cmd = f"nohup bash -c '{latex_sh}' > '{state_file}' 2>&1 & echo $! > '{pid_file}'"
-            subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-    except Exception as e:
-        print(f"Error launching LaTeX installation: {e}")
-        return False
 
-    try:
-        with open(pid_file, "r") as f:
-            pid_code = f.read().strip()
-        print(
-            f"Installing LaTeX... PID: {pid_code} | Estimated time remaining: ~57 minutes. You can continue using the package."
-        )
-    except FileNotFoundError:
-        print("PID file not created. Installation may not have started correctly.")
-        return False
+    cmd = f"nohup bash -c {latex_sh} > {state_file} 2>&1 & echo $! > {pid_file}"
+    os.system(cmd)
+
+    with open(pid_file, "r") as f:
+        pid_code = f.read().strip()
+        print(f"Installing LaTeX... PID: {pid_code}"
+              f" | Estimated time remaining: ~57 minutes. You can continue using the package.")
 
     return False
