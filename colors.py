@@ -424,21 +424,121 @@ class IPCCColorMaps:
                 "Invalid key type, please provide a valid colormap name or a list of colors in hex format."
             )
 
-    def adjust(
+    def add_colors(
         self,
-        cmap_name,
-        N: int = 25,
+        obj,
+        cmap,
         *,
-        split: tuple[float, float] = (0, 1),
-        discrete: bool = True,
+        N=None,
+        where: Literal["left", "middle", "right"] = "left",
+        discrete=True,
         reverse: bool = False,
     ):
 
-        cmap = self.colormaps.get(cmap_name)
-        if cmap is None:
-            raise KeyError(
-                f"Colormap '{cmap_name}' is not available {self._hint(cmap_name)}"
+        if reverse:
+            cmap = cmap.reversed()
+
+        N = self.N if N is None else N
+        odd_N = lambda x: x if x % 2 == 1 else x + 1
+        N = odd_N(N) if where == 0 else N
+
+        # Ensure `objs` is a list of strings
+        if isinstance(obj, str):
+            objs = [obj]
+        elif isinstance(obj, (list, tuple)):
+            objs = list(obj)
+        else:
+            raise TypeError(
+                "Invalid colors specified. Please provide a list of valid color names or hex values."
             )
+
+        colors_to_add = []
+        for color in objs:
+            if isinstance(color, str):
+                if color.startswith("#"):
+                    colors_to_add.append(color)
+                elif mcolors.CSS4_COLORS.get(color) is not None:
+                    colors_to_add.append(to_hex(mcolors.CSS4_COLORS[color]))
+                else:
+                    raise ValueError(
+                        f"Invalid color '{color}'. Must be a hex code or a named CSS4 color."
+                    )
+            else:
+                raise TypeError("Color must be a string (hex or named CSS4 color).")
+
+        colors = [to_hex(tuple(c), keep_alpha=True) for c in cmap(np.linspace(0, 1, N))]
+
+        if where == "left":
+            new_colors = colors_to_add + colors
+
+        elif where == "middle":
+            half = len(colors) // 2
+            new_colors = colors[:half] + colors_to_add + colors[half:]
+        elif where == "right":
+            new_colors = colors + colors_to_add
+            discrete = False
+
+        else:
+            raise ValueError("`pos` must be 'left', 'middle', or 'right'.")
+
+        new_colors = np.array(new_colors)
+
+        N += len(colors_to_add)
+
+        if discrete:
+            cmap = ListedColormap(new_colors, N=N, name=cmap.name)
+        else:
+            cmap = LinearSegmentedColormap.from_list(cmap.name, new_colors, N=N)
+
+        return cmap
+
+    def adjust(
+        self,
+        cmap=None,
+        N: int = 25,
+        *,
+        split: tuple[float, float] = (0, 1),
+        add_colors: Union[str, list[str]] = None,
+        where: Literal["left", "middle", "right"] = "left",
+        reverse: bool = False,
+        discrete: bool = True,
+    ):
+        """
+        Access a colormap by name or object and apply optional adjustments.
+
+        Parameters:
+            cmap (str or matplotlib.colors.Colormap, optional):
+                A string name of the colormap to retrieve from `self.colormaps`, or a matplotlib-compatible colormap object.
+                If a string is provided, it will be looked up from `self.colormaps`.
+
+            N (int, default=256):
+                Number of colors in the colormap if `discrete=True`.
+
+            split (tuple[float, float], default=(0.0, 1.0)):
+                Fraction of the colormap to retain. Must be a pair of floats in [0.0, 1.0] representing the start and end positions.
+
+            add_colors (str or list of str, optional):
+                A color (e.g., "#FF0000", "red") or list of colors to add to the colormap. Only used if specified.
+
+            where (str, optional):
+                Location to insert `add_colors` into the colormap. Must be one of {"left", "middle", "right"}.
+                Required if `add_colors` is specified.
+
+            discrete (bool, default=True):
+                Whether to convert the colormap into a discrete one with `N` bins.
+
+            reverse (bool, default=False):
+                Whether to reverse the colormap.
+
+        Returns:
+            matplotlib.colors.Colormap:
+                The adjusted colormap object.
+        """
+
+        if isinstance(cmap, str):
+            cmap = self.colormaps.get(cmap)
+            if cmap is None:
+                raise KeyError(f"Colormap '{cmap}' is not available {self._hint(cmap)}")
 
         if reverse:
             res = cmap.reversed()
@@ -453,6 +553,17 @@ class IPCCColorMaps:
             res = ListedColormap(colors, N=N, name=cmap.name)
         else:
             res = LinearSegmentedColormap.from_list(cmap.name, colors, N=N)
+
+        if add_colors:
+            if where == "right":
+                discrete = False
+            res = self.add_colors(
+                add_colors,
+                res,
+                N=N,
+                where=where,
+                discrete=discrete,
+            )
 
         return res
 
@@ -494,58 +605,20 @@ class IPCCColorMapsManager:
         *,
         split: tuple[float, float] = (0, 1),
         add_colors: Union[str, list[str]] = None,
-        where: Literal["left_end", "middle", "right_end"] = "left_end",
+        where: Literal["left", "middle", "right"] = "left",
         reverse: bool = False,
         discrete: bool = True,
     ):
-        """
-        Access a colormap by name and make adjustments to it.
-
-        Parameters:
-
-            cmap : str, optional
-                    The name of the colormap to load. If specified, the colormap is returned directly`.
-            N : int, default=256
-                    The number of colors in the colormap.
-            split : tuple, default=(0, 1)
-                    A tuple of two floats (start, end). The range of the colormap to use.
-            add_colors : str, default=None
-                    The color to add to the colormap. If specified, the color is added to the colormap at the specified position.
-            where : str, "left_end", "middle", "right_end"
-                    The position to add the color to the colormap if add_colors is specified.
-            discrete : bool, default=True
-                Whether to create a discrete colormap.
-        Returns:
-
-            cmap : matplotlib.colors.Colormap
-                    The colormap object
-
-        Examples:
-
-            >>> ipcc_cmaps["temp_seq"].adjust(N=10) # returns the temp_seq colormap with 10 colors
-            >>> ipcc_cmaps["temp_seq"].adjust(N=10, discrete=True) # returns the temp_seq colormap with 10 colors as a continuous colormap
-            >>> ipcc_cmaps["temp_seq"] # returns the temp_seq colormap
-            >>> ipcc_cmaps["temp_seq"].adjust(N=10, split = (0, 0.5)) # returns the temp_seq colormap with 10 colors and only the first half of the colormap
-
-        """
 
         self._cmap = self._parent.adjust(
             self.name,
             N=N,
-            discrete=discrete,
-            reverse=reverse,
             split=split,
+            add_colors=add_colors,
+            where=where,
+            reverse=reverse,
+            discrete=discrete,
         )
-
-        if add_colors:
-            if where == "right_end":
-                discrete = False
-            self._cmap = self.add_colors(
-                add_colors,
-                N=N,
-                where=where,
-                discrete=discrete,
-            )
 
         return self._cmap
 
@@ -588,75 +661,6 @@ class IPCCColorMapsManager:
         plt.title(self.name, loc="left", color="white")
 
         plt.show()
-
-    def add_colors(
-        self,
-        obj,
-        *,
-        N=None,
-        where: Literal["left_end", "middle", "right_end"] = "left_end",
-        discrete=True,
-        reverse: bool = False,
-    ):
-
-        if reverse:
-            self._cmap = self._cmap.reversed()
-
-        N = self.N if N is None else N
-        odd_N = lambda x: x if x % 2 == 1 else x + 1
-        N = odd_N(N) if where == 0 else N
-
-        # Ensure `objs` is a list of strings
-        if isinstance(obj, str):
-            objs = [obj]
-        elif isinstance(obj, (list, tuple)):
-            objs = list(obj)
-        else:
-            raise TypeError(
-                "Invalid colors specified. Please provide a list of valid color names or hex values."
-            )
-
-        colors_to_add = []
-        for color in objs:
-            if isinstance(color, str):
-                if color.startswith("#"):
-                    colors_to_add.append(color)
-                elif mcolors.CSS4_COLORS.get(color) is not None:
-                    colors_to_add.append(to_hex(mcolors.CSS4_COLORS[color]))
-                else:
-                    raise ValueError(
-                        f"Invalid color '{color}'. Must be a hex code or a named CSS4 color."
-                    )
-            else:
-                raise TypeError("Color must be a string (hex or named CSS4 color).")
-
-        colors = [
-            to_hex(tuple(c), keep_alpha=True) for c in self._cmap(np.linspace(0, 1, N))
-        ]
-
-        if where == "left_end":
-            new_colors = colors_to_add + colors
-
-        elif where == "middle":
-            half = len(colors) // 2
-            new_colors = colors[:half] + colors_to_add + colors[half:]
-        elif where == "right_end":
-            new_colors = colors + colors_to_add
-            discrete = False
-
-        else:
-            raise ValueError("`pos` must be 'left_end, 'middle'")
-
-        new_colors = np.array(new_colors)
-
-        if discrete:
-            cmap = ListedColormap(new_colors, N=N, name=self._cmap.name)
-        else:
-            cmap = LinearSegmentedColormap.from_list(self._cmap.name, new_colors, N=N)
-
-        self._cmap = cmap
-
-        return self._cmap
 
     def reverse(self):
         return self._cmap.reversed()
