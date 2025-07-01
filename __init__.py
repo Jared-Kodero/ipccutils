@@ -17,7 +17,9 @@ Available Functions and Constants:
 Example Usage:
 
     Importing the module:
-        >>> from ipccutils import *
+        >>> from pathlib import Path
+
+from ipccutils import *
 from tools import *  # Imports all functions and constants
 
     Setting the plot theme:

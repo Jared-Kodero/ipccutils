@@ -17,7 +17,9 @@ Available Functions and Constants:
 Example Usage:
 
     Importing the module:
-        >>> from ipccutils import *
+        >>> from pathlib import Path
+
+from ipccutils import *
 from tools import *  # Imports all functions and constants
 
     Setting the plot theme:
@@ -40,4 +42,6 @@ from tools import *  # Imports all functions and constants
 
 ```
 
-The ipcccutils library I am calling a “package” in quotes because it currently has the core structure of any package you would install using conda or pip; there is an __init__.py file that allows you to access all of the library’s modules and the functions within, using a single from ipccutils import * command. However, this “package” is not available through conda or pip yet. In the meantime, you can get the package by cloning the repo.
+The ipcccutils library I am calling a “package” in quotes because it currently has the core structure of any package you would install using conda or pip; there is an __init__.py file that allows you to access all of the library’s modules and the functions within, using a single from pathlib import Path
+
+from ipccutils import * command. However, this “package” is not available through conda or pip yet. In the meantime, you can get the package by cloning the repo.
