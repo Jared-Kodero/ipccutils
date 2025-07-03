@@ -622,7 +622,7 @@ class IPCCColorMapsManager:
 
         return self._cmap
 
-    def colors_list(
+    def get_colors(
         self, *, reverse: bool = False, split: tuple[float, float] = (0, 1), N=None
     ):
         """
