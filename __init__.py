@@ -26,7 +26,6 @@ from tools import *  # Imports all functions and constants
         >>> set_plot_theme(font_scale=1.5, line_width=1.5, latex=False)
 
     Working with colormaps:
-        >>> ipcc_cmap["balance"].preview()  # Preview the 'balance' colormap
         >>> ipcc_cmap.balance  # Access the 'balance' colormap
         >>> ipcc_cmap["balance_r"].adjust(N=10, split=0.5)  # Adjust the reversed 'balance' colormap
         >>> ipcc_cmap["#000000", "#ff0000", "#ffffff"].blend(N=60, discrete=True)  # Create a custom colormap

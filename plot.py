@@ -1,3 +1,4 @@
+import functools
 from typing import Literal, Union
 
 import cartopy.crs as ccrs
@@ -269,6 +270,7 @@ def cartplot(
     robust: bool = False,
     gridlines: bool = False,
     cbar_orientation: Literal["vertical", "horizontal"] = "vertical",
+    draw_cbar_edges: bool = True,
     cbar_label: str = None,
     global_extent: bool = False,
     bbox: tuple[float, float, float, float] = None,
@@ -323,6 +325,8 @@ def cartplot(
 
     cbar_label : str, optional
         Label for the colorbar.
+    draw_cbar_edges : bool, default True
+        If True, draws edges on the colorbar for better visibility.
 
     global_extent : bool, default False
         If True, sets extent to show the entire globe.
@@ -415,6 +419,7 @@ def cartplot(
     cbar_label = plot_kwargs.pop("cbar_label", None)
     return_plot = plot_kwargs.pop("return_plot", False)
     gridlines = plot_kwargs.pop("gridlines", False)
+    draw_cbar_edges = plot_kwargs.pop("draw_cbar_edges", True)
 
     if map_type not in plot_funcs:
         raise ValueError(
@@ -451,7 +456,7 @@ def cartplot(
         cax=cax,
         ax=ax,
         orientation=cbar_orientation,
-        drawedges=True,
+        drawedges=draw_cbar_edges,
     )
 
     if cbar_label:
@@ -460,3 +465,17 @@ def cartplot(
     res = (fig, ax) if not return_plot else (fig, ax, p)
 
     return res
+
+
+@xr.register_dataarray_accessor("cartplot")
+class MapPlotAccessor:
+
+    __doc__ = cartplot.__doc__
+
+    def __init__(self, xarray_obj):
+        self._obj = xarray_obj
+
+    @functools.wraps(cartplot)
+    def __call__(self, *args, **kwargs):
+        # The DataArray is passed as the first positional argument
+        return cartplot(self._obj, *args, **kwargs)

@@ -1,4 +1,5 @@
 import difflib
+import functools
 import os
 import sys
 from typing import Literal, Union
@@ -146,11 +147,7 @@ class IPCCColorMaps:
             self.colormaps[cmap_name] = cmap
 
     @property
-    def values(self):
-        return [name for name in self.colormaps]
-
-    @property
-    def cmaps(self):
+    def list_cmaps(self):
         for cmap_name in self.colormaps:
 
             fig, ax = plt.subplots(figsize=(5, 0.3))
@@ -168,7 +165,6 @@ class IPCCColorMaps:
             plt.show()
 
     def _hint(self, name, hint=None):
-
         suggestions = difflib.get_close_matches(name, self.colormaps.keys(), n=5)
         if suggestions != []:
             hint = f"Did you mean one of {suggestions}?"
@@ -348,16 +344,13 @@ class IPCCColorMaps:
         return len(self.colormaps)
 
     def __dir__(self):
-        return list(self.colormaps.keys())
+        return sorted(set(super().__dir__()) | set(self.colormaps.keys()))
 
     def __contains__(self, key):
         return key in self.colormaps
 
     def __getattr__(self, key):
-        if key in self.colormaps:
-            return self.colormaps[key]
-        else:
-            raise KeyError(f"Colormap '{key}' is not available {self._hint(key)}")
+        return self._validate_getitem(key)
 
     def __getitem__(self, key):
         return self._validate_getitem(key)
@@ -366,13 +359,10 @@ class IPCCColorMaps:
 class IPCCColorMapsManager:
     def __init__(self, name: str, cmap, parent: "IPCCColorMaps"):
         self.name = name
-        self._cmap = cmap
-        self._parent = parent
+        self.cmap = cmap
+        self.parent = parent
 
-    @property
-    def get(self):
-        return self._cmap
-
+    @functools.wraps(IPCCColorMaps.adjust)
     def adjust(
         self,
         N: int = 25,
@@ -384,7 +374,7 @@ class IPCCColorMapsManager:
         discrete: bool = True,
     ):
 
-        self._cmap = self._parent.adjust(
+        self.cmap = self.parent.adjust(
             self.name,
             N=N,
             split=split,
@@ -394,7 +384,7 @@ class IPCCColorMapsManager:
             discrete=discrete,
         )
 
-        return self._cmap
+        return self.cmap
 
     def get_colors(
         self, *, reverse: bool = False, split: tuple[float, float] = (0, 1), N=None
@@ -414,45 +404,44 @@ class IPCCColorMapsManager:
         """
 
         if reverse:
-            self._cmap = self._cmap.reversed()
+            self.cmap = self.cmap.reversed()
 
         N = self.N if N is None else N
 
         if not isinstance(split, tuple) or len(split) != 2:
             raise ValueError("`split` must be a tuple of two floats (start, end).")
 
-        return [to_hex(c) for c in self._cmap(np.linspace(split[0], split[1], self.N))]
+        return [to_hex(c) for c in self.cmap(np.linspace(split[0], split[1], self.N))]
 
-    def preview(self, N=None):
-        fig, ax = plt.subplots(figsize=(6, 0.5))
+    @functools.wraps(IPCCColorMaps.adjust)
+    def __call__(
+        self,
+        N: int = 25,
+        *,
+        split: tuple[float, float] = (0, 1),
+        add_colors: Union[str, list[str]] = None,
+        where: Literal["left", "middle", "right"] = "left",
+        reverse: bool = False,
+        discrete: bool = True,
+    ):
 
-        N = self.N if N is None else N
-
-        plt.imshow(np.linspace(0, 1, N).reshape(1, N), aspect="auto", cmap=self._cmap)
-
-        fig.patch.set_visible(False)
-        ax.axis("off")
-        plt.title(self.name, loc="left", color="white")
-
-        plt.show()
-
-    def reverse(self):
-        return self._cmap.reversed()
-
-    def __dir__(self):
-        return list(self._parent.colormaps.keys())
-
-    def __call__(self):
-        return self
+        return self.adjust(
+            N=N,
+            split=split,
+            add_colors=add_colors,
+            where=where,
+            reverse=reverse,
+            discrete=discrete,
+        )
 
     def __getattr__(self, attr):
-        return getattr(self._cmap, attr)
+        return getattr(self.cmap, attr)
 
     def __repr__(self):
-        return self._cmap.name
+        return self.cmap.name
 
     def __str__(self):
-        return self._cmap.name
+        return self.cmap.name
 
 
 class BlendedColormap:
