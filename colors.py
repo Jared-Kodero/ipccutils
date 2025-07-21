@@ -3,8 +3,6 @@ import os
 import sys
 from typing import Literal, Union
 
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import cmocean
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -101,233 +99,11 @@ def set_plot_theme(
     )
 
 
-def get_cbar_axes(
-    *,
-    fig: plt.Figure = None,
-    axes: plt.Axes = None,
-    subplots=False,
-    orientation: Literal["vertical", "horizontal"] = "vertical",
-    pad=0.04,
-) -> plt.Axes:
-    """
-    Create a new set of axes for a colorbar by stealing space from the current axes.
-    This is useful for adding a colorbar to a plot without overlapping the existing axes.
-
-    Parameters
-    ----------
-    fig : matplotlib.figure.Figure, optional
-        The figure to which the colorbar axes will be added. If None, uses the current figure.
-    ax : matplotlib.axes.Axes, optional
-        The axes from which space will be stolen. If None, uses the current axes.
-    pad : float, optional
-        The padding between the colorbar axes and the existing axes. Default is 0.04. Try 0.04 and 0.05
-    subplots : bool, optional
-        If True, the function will adjust the colorbar position based on the subplots in the figure.
-        This is useful when the figure has multiple subplots and you want to ensure the colorbar does not overlap with them.
-        if True, the axes and fig must be provided and will be used to determine the position of the colorbar.
-
-    orientation : str, optional
-        The orientation of the colorbar. Can be either "vertical" or "horizontal". Default is "vertical".
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The new axes for the colorbar.
-    """
-
-    if subplots and axes is None:
-        raise ValueError("If subplots is True, axes and fig must be provided.")
-
-    if fig is None:
-        fig = plt.gcf()
-    if axes is None:
-        axes = plt.gca()
-
-    plt.tight_layout()
-
-    fig_width, fig_height = fig.get_size_inches()
-
-    def _create_cax(y0, x0, y1, x1, x_len, y_len):
-        if orientation == "vertical":
-
-            bottommost = y0
-            height = y_len
-            rightmost = pad * height + x1
-            norm = pad if fig_height < 5 else 0.05
-            width = norm * height
-
-            cax = fig.add_axes([rightmost, bottommost, width, height])
-
-        elif orientation == "horizontal":
-
-            rightmost = x0
-            width = x_len
-            bottommost = y0 - (0.12 * width)
-            norm = pad if fig_width < 5 else 0.05
-            height = norm * width
-
-            cax = fig.add_axes([rightmost, bottommost, width, height])
-
-        return cax
-
-    if not subplots:
-        pos = axes.get_position()
-        fig_x_len = pos.x1 - pos.x0
-        fig_y_len = pos.y1 - pos.y0
-        cax = _create_cax(pos.y0, pos.x0, pos.y1, pos.x1, fig_x_len, fig_y_len)
-
-    elif subplots:
-
-        nrows, ncols = 1, 1
-
-        if isinstance(axes, plt.Axes):
-            nrows, ncols = 1, 1
-
-        elif axes.ndim == 2:
-            nrows, ncols = axes.shape
-        elif axes.ndim == 1:
-            # Need to ask figure
-            last_ax = fig.axes[-1]
-            nrows = last_ax.get_subplotspec().rowspan.stop
-            ncols = last_ax.get_subplotspec().colspan.stop
-
-        axes = np.reshape(axes, (nrows, ncols))
-        right_axes = axes[:, -1]  # All rows, last column
-        bottom_axes = axes[-1, :]  # Last row, all columns
-
-        top_right_ax = right_axes[0].get_position()
-        bot_right_ax = right_axes[-1].get_position()
-        left_bot_ax = bottom_axes[0].get_position()
-        right_bot_ax = bottom_axes[-1].get_position()
-
-        fig_x_len = right_bot_ax.x1 - left_bot_ax.x0
-        fig_y_len = top_right_ax.y1 - bot_right_ax.y0
-
-        cax = _create_cax(
-            bot_right_ax.y0,
-            left_bot_ax.x0,
-            top_right_ax.y1,
-            right_bot_ax.x1,
-            fig_x_len,
-            fig_y_len,
-        )
-
-    return cax
-
-
 def spine_off(ax=None):
 
     ax = plt.gca() if ax is None else ax
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-
-
-def get_text_color(cmap):
-    """
-    Returns a grayscale hex code that maximizes the minimum contrast ratio
-    across all colors in the colormap. Suitable for text/annotations.
-
-    Parameters
-    ----------
-
-    cmap : str or matplotlib.colors.Colormap
-    """
-
-    if isinstance(cmap, str):
-        cmap = plt.colormaps[cmap]
-
-    values = np.linspace(0, 1, cmap.N)
-    colors = cmap(values)[:, :3]
-
-    linear_colors = np.where(
-        colors <= 0.04045, colors / 12.92, ((colors + 0.055) / 1.055) ** 2.4
-    )
-    colormap_luminance = np.dot(linear_colors, [0.2126, 0.7152, 0.0722])
-
-    candidates = np.linspace(0, 1, 256)
-
-    candidate_lum = np.where(
-        candidates <= 0.04045, candidates / 12.92, ((candidates + 0.055) / 1.055) ** 2.4
-    )
-
-    lighter = np.maximum(candidate_lum[:, None], colormap_luminance)
-    darker = np.minimum(candidate_lum[:, None], colormap_luminance)
-    contrast_ratios = (lighter + 0.05) / (darker + 0.05)
-
-    min_contrasts = np.min(contrast_ratios, axis=1)
-    best_idx = np.argmax(min_contrasts)
-    best_gray = candidates[best_idx]
-
-    gray_8bit = int(np.round(best_gray * 255))
-    return f"#{gray_8bit:02x}{gray_8bit:02x}{gray_8bit:02x}"
-
-
-def create_map_figure(
-    *,
-    projection=ccrs.PlateCarree(),
-    figsize: tuple = None,
-    global_extent: bool = False,
-    only_ocean: bool = False,
-    states: bool = True,
-    borders: bool = True,
-    facecolor: str = "grey",
-    edgecolor: str = "face",
-):
-    """
-    Create a map figure with the given projection.
-
-    Parameters
-    ----------
-    projection: cartopy.crs.Projection
-        The projection to use for the map. example: ccrs.PlateCarree(), ccrs.Robinson(), ccrs.Mollweide() etc.
-    figsize: tuple
-        The size of the figure. If None, the default size will be used.
-    global_extent: bool
-        If True, the map will be set to the global extent.
-    bbox: tuple
-        The bounding box of the map in the form (min_lon, min_lat, max_lon, max_lat).
-    only_ocean: bool
-        If True, continents face will be set to the facecolor.
-    states: bool
-        If True, the states boundaries will be added.
-    borders: bool
-        If True, the coutries boundaries will be added.
-        The facecolor of the map.
-    edgecolor: str
-        The edgecolor of the map.
-    Returns
-    -------
-    fig: matplotlib.figure.Figure
-        The figure object.
-    ax: matplotlib.axes.Axes
-        The axes object.
-    """
-    fig, ax = plt.subplots(subplot_kw={"projection": projection}, figsize=figsize)
-
-    if global_extent:
-        ax.set_global()
-
-    ax.add_feature(cfeature.COASTLINE)
-
-    if only_ocean:
-
-        ax.add_feature(
-            cfeature.NaturalEarthFeature(
-                "physical",
-                "land",
-                "50m",
-                edgecolor=edgecolor,
-                facecolor=facecolor,
-                alpha=0.5,
-            )
-        )
-
-    if states:
-        ax.add_feature(cfeature.STATES, linestyle="-", alpha=0.3)
-    if borders:
-        ax.add_feature(cfeature.BORDERS, linestyle="-", alpha=0.3)
-
-    return fig, ax
 
 
 class IPCCColorMaps:
@@ -342,8 +118,6 @@ class IPCCColorMaps:
         instance._load_colormaps()
 
         return instance
-
-    set_plot_theme()
 
     SRC_DIR = SCRIPT_DIR / "src" / "data"
 

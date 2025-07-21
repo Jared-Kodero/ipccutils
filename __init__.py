@@ -40,20 +40,14 @@ from tools import *  # Imports all functions and constants
 
 """
 
-from .colors import (
-    create_map_figure,
-    get_cbar_axes,
-    get_text_color,
-    ipcc_cmap,
-    set_plot_theme,
-    spine_off,
-)
+from .colors import ipcc_cmap, set_plot_theme, spine_off
+from .plot import cartplot, create_map_figure, get_cbar_axes
 
 __all__ = [
     "set_plot_theme",
     "ipcc_cmap",
-    "get_text_color",
     "spine_off",
     "get_cbar_axes",
     "create_map_figure",
+    "cartplot",
 ]
