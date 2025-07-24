@@ -13,9 +13,9 @@ def get_cbar_axes(
     *,
     fig: plt.Figure = None,
     axes: plt.Axes = None,
-    subplots=False,
+    subplots: bool = False,
     orientation: Literal["vertical", "horizontal"] = "vertical",
-    pad=0.04,
+    pad: float = 0.04,
 ) -> plt.Axes:
     """
     Create a new set of axes for a colorbar by stealing space from the current axes.
@@ -140,13 +140,14 @@ def create_map_figure(
     figsize: tuple[float, float] = None,
     global_extent: bool = False,
     central_longitude: float = 0.0,
-    bbox: tuple[float, float, float, float] = None,
-    only_ocean: bool = False,
-    only_land: bool = False,
     states: bool = True,
     borders: bool = True,
     facecolor: str = "grey",
     edgecolor: str = "face",
+    bbox: tuple[float, float, float, float] = None,
+    coastlines: bool = True,
+    ocean: bool = True,
+    land: bool = True,
 ):
     """
     Create a Cartopy map figure using a specified map projection and extent.
@@ -174,8 +175,14 @@ def create_map_figure(
         Bounding box for the map extent in the form (min_lon, min_lat, max_lon, max_lat).
         Ignored if `global_extent=True`.
 
-    only_ocean : bool, default False
+    coastlines : bool, default True
+        If True, adds coastlines to the map.
+
+    ocean : bool, default False
         If True, shades ocean areas with a default image and hides land.
+
+    land : bool, default True
+        If True, shades land areas with a default image and hides ocean.
 
     states : bool, default True
         If True, overlays U.S. state boundaries (visible in North America extent).
@@ -219,9 +226,10 @@ def create_map_figure(
     if global_extent:
         ax.set_global()
 
-    ax.add_feature(cfeature.COASTLINE)
+    if coastlines:
+        ax.add_feature(cfeature.COASTLINE)
 
-    if only_ocean:
+    if ocean and not land:
 
         ax.add_feature(
             cfeature.NaturalEarthFeature(
@@ -248,8 +256,9 @@ def create_map_figure(
 def cartplot(
     data: xr.DataArray,
     *,
-    figsize: tuple[float, float] = None,
-    map_type: Literal["pcolormesh", "contourf", "contour", "imshow"] = None,
+    plot_type: Literal[
+        "default", "pcolormesh", "contourf", "contour", "imshow"
+    ] = "default",
     projection: Literal[
         "PlateCarree",
         "Mercator",
@@ -263,24 +272,25 @@ def cartplot(
         "SouthPolarStereo",
     ] = "PlateCarree",
     central_longitude: float = 0.0,
+    global_extent: bool = False,
+    figsize: tuple[float, float] = None,
     cmap: Union[str, mcolors.Colormap] = None,
     vmin: float = None,
     vmax: float = None,
     levels: Union[int, list] = None,
     robust: bool = False,
     gridlines: bool = False,
-    cbar_orientation: Literal["vertical", "horizontal"] = "vertical",
-    draw_cbar_edges: bool = True,
+    orientation: Literal["vertical", "horizontal"] = "vertical",
+    drawedges: bool = False,
     cbar_label: str = None,
-    global_extent: bool = False,
-    bbox: tuple[float, float, float, float] = None,
-    only_ocean: bool = False,
-    only_land: bool = False,
     states: bool = True,
     borders: bool = True,
     facecolor: str = "grey",
     edgecolor: str = "face",
-    return_plot: bool = False,
+    bbox: tuple[float, float, float, float] = None,
+    coastlines: bool = True,
+    ocean: bool = True,
+    land: bool = True,
 ):
     """
     Plot an xarray DataArray on a Cartopy map using the specified projection and plot type.
@@ -290,97 +300,98 @@ def cartplot(
     data : xr.DataArray
         The 2D data to plot. Should contain spatial dimensions (e.g., lat/lon or x/y).
 
-    figsize : tuple of float, optional
-        Figure size in inches, as (width, height).
-
     map_type : {"pcolormesh", "contourf", "contour", "imshow"}, optional
         The type of plot to generate. If None, defaults to `DataArray.plot()` behavior.
 
-    projection : str, default "PlateCarree"
-        Cartopy CRS projection name. One of:
-        {"PlateCarree", "Mercator", "Robinson", "Mollweide", "Orthographic",
-         "LambertConformal", "AlbersEqualArea", "Stereographic",
-         "NorthPolarStereo", "SouthPolarStereo"}.
+    projection : {"PlateCarree", "Mercator", "Robinson", "Mollweide", "Orthographic",
+                  "LambertConformal", "AlbersEqualArea", "Stereographic",
+                  "NorthPolarStereo", "SouthPolarStereo"}, default: "PlateCarree"
+        The Cartopy CRS projection to use for the map.
 
-    central_longitude : float, default 0.0
+    central_longitude : float, default: 0.0
         Central longitude of the projection.
 
-    central_latitude : float, default 0.0
-        Central latitude for projections that require it (e.g., Orthographic).
+    global_extent : bool, default: False
+        If True, sets extent to show the entire globe. Otherwise, uses `bbox` if given.
+
+    figsize : tuple of float, optional
+        Figure size in inches, as (width, height).
 
     cmap : str or matplotlib.colors.Colormap, optional
         Colormap to use for the plot.
 
-    vmin, vmax : float, optional
-        Color limits for the plot. If not specified, determined automatically.
+    vmin : float, optional
+        Minimum data value for color scaling.
+
+    vmax : float, optional
+        Maximum data value for color scaling.
 
     levels : int or list of float, optional
-        Number of contour levels or specific contour values. Used for contour and contourf plots.
+        Number of contour levels (int) or specific contour values (list).
+        Used for contour and contourf plots.
 
-    robust : bool, default False
-        If True and `vmin`/`vmax` are not specified, uses the 2nd and 98th percentiles for color limits.
+    robust : bool, default: False
+        If True and `vmin`/`vmax` are not specified, uses the 2nd and 98th percentiles
+        for color limits to reduce the impact of outliers.
 
-    cbar_orientation : {"vertical", "horizontal"}, default "vertical"
+    gridlines : bool, default: False
+        If True, overlays latitude/longitude gridlines.
+
+    orientation : {"vertical", "horizontal"}, default: "vertical"
         Orientation of the colorbar.
+
+    draw_cbar_edges : bool, default: True
+        If True, draws edges on the colorbar for better visibility.
 
     cbar_label : str, optional
         Label for the colorbar.
-    draw_cbar_edges : bool, default True
-        If True, draws edges on the colorbar for better visibility.
 
-    global_extent : bool, default False
-        If True, sets extent to show the entire globe.
+    states : bool, default: True
+        If True, overlays U.S. state boundaries (only visible in appropriate extents).
 
-    gridlines : bool, default False
-        If True, adds gridlines to the map.
+    borders : bool, default: True
+        If True, overlays international borders.
+
+    facecolor : str, default: "grey"
+        Fill color for landmasses or continents.
+
+    edgecolor : str, default: "face"
+        Edge color for coastlines and borders.
 
     bbox : tuple of float, optional
         Geographic extent to display in (min_lon, min_lat, max_lon, max_lat) format.
         Ignored if `global_extent=True`.
 
-    only_ocean : bool, default False
-        If True, shades only ocean areas and hides land using
+    coastlines : bool, default: True
+        If True, adds coastlines to the map.
 
-    only_land : bool, default False
-        If True, shades only land areas and hides ocean.
+    ocean : bool, default: True
+        If True, displays ocean features.
 
-    states : bool, default True
-        If True, overlays U.S. state boundaries (only visible in appropriate extents).
-
-    borders : bool, default True
-        If True, overlays international borders.
-
-    facecolor : str, default "grey"
-        Fill color for continents.
-
-    edgecolor : str, default "face"
-        Edge color for coastlines and borders.
-
-    return_plot : bool, default False
-        If True, returns the figure and axes objects along with the plot object.
-        If False, only returns the figure and axes.
+    land : bool, default: True
+        If True, displays land features.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
         The Matplotlib Figure object.
 
-    ax : matplotlib.axes._subplots.AxesSubplot
+    ax : cartopy.mpl.geoaxes.GeoAxesSubplot
         The Cartopy-aware Axes with the plotted map.
 
-    p : matplotlib.collections.QuadMesh or ContourSet
+    p : matplotlib.collections.QuadMesh or matplotlib.contour.ContourSet
         The plotted data object.
 
     Notes
     -----
-    This function requires `cartopy` and `matplotlib`. It is intended for 2D spatial
-    `xarray.DataArray` objects.
+    - This function requires `cartopy` and `matplotlib`.
+    - It is intended for 2D spatial `xarray.DataArray` objects with geographic dimensions.
+    - Some features (e.g., borders and state lines) require Natural Earth shapefiles
+      which `cartopy` can download automatically.
     """
 
-    # capture local kwargs
-    kwargs = locals()
-    # Define which kwargs go to map setup
-    map_keys = {
+    allargs = locals()
+    map_keys = (
         "projection",
         "figsize",
         "global_extent",
@@ -393,49 +404,45 @@ def cartplot(
         "edgecolor",
         "central_longitude",
         "central_latitude",
-    }
+    )
 
-    if only_ocean and only_land:
-        raise ValueError(
-            "Cannot use both `only_ocean` and `only_land` at the same time."
-        )
+    map_kwargs = {k: v for k, v in allargs.items() if k in map_keys}
+    plot_kwargs = {k: v for k, v in allargs.items() if k not in map_keys}
 
-    map_kwargs = {k: v for k, v in kwargs.items() if k in map_keys}
-    plot_kwargs = {k: v for k, v in kwargs.items() if k not in map_keys}
+    plot_type = plot_kwargs.pop("plot_type", "default")
+    orientation = plot_kwargs.pop("orientation", "vertical")
+    cbar_label = plot_kwargs.pop("cbar_label", None)
+    gridlines = plot_kwargs.pop("gridlines", False)
+    drawedges = plot_kwargs.pop("drawedges", True)
+    ocean = plot_kwargs.pop("ocean", True)
+    land = plot_kwargs.pop("land", True)
+    coastlines = plot_kwargs.pop("coastlines", True)
 
-    # Setup figure and axis
     fig, ax = create_map_figure(**map_kwargs)
 
     plot_funcs = {
+        "default": data.plot,
         "pcolormesh": data.plot.pcolormesh,
         "contourf": data.plot.contourf,
         "contour": data.plot.contour,
         "imshow": data.plot.imshow,
-        None: data.plot,
     }
 
-    map_type = plot_kwargs.pop("map_type", None)
-    cbar_orientation = plot_kwargs.pop("cbar_orientation", "vertical")
-    cbar_label = plot_kwargs.pop("cbar_label", None)
-    return_plot = plot_kwargs.pop("return_plot", False)
-    gridlines = plot_kwargs.pop("gridlines", False)
-    draw_cbar_edges = plot_kwargs.pop("draw_cbar_edges", True)
-
-    if map_type not in plot_funcs:
+    if plot_type not in plot_funcs:
         raise ValueError(
-            f"Invalid map_type '{map_type}'. Choose from {list(plot_funcs)}."
+            f"Invalid plot_type '{plot_type}'. Choose from {list(plot_funcs)}."
         )
 
-    plot_func = plot_funcs[map_type]
+    plot_func = plot_funcs[plot_type]
 
     # Plot the data
     p = plot_func(
         ax=ax, add_colorbar=False, transform=ccrs.PlateCarree(), **plot_kwargs
     )
 
-    if only_ocean:
+    if ocean and not land:
         ax.add_feature(cfeature.LAND, facecolor="white", zorder=1)
-    elif only_land:
+    elif land and not ocean:
         ax.add_feature(cfeature.OCEAN, facecolor="white", zorder=1)
 
     if gridlines:
@@ -443,39 +450,32 @@ def cartplot(
             draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--"
         )
 
-        # Enable only left and bottom labels
         gl.top_labels = False
         gl.right_labels = False
         gl.bottom_labels = True
         gl.left_labels = True
 
-    cax = get_cbar_axes(fig=fig, axes=ax, orientation=cbar_orientation)
+    cax = get_cbar_axes(fig=fig, axes=ax, orientation=orientation)
 
     cb = plt.colorbar(
         p,
         cax=cax,
         ax=ax,
-        orientation=cbar_orientation,
-        drawedges=draw_cbar_edges,
+        orientation=orientation,
+        drawedges=drawedges,
     )
 
     if cbar_label:
         cb.set_label(cbar_label)
 
-    res = (fig, ax) if not return_plot else (fig, ax, p)
-
-    return res
+    return (fig, ax, p)
 
 
-@xr.register_dataarray_accessor("cartplot")
-class MapPlotAccessor:
-
-    __doc__ = cartplot.__doc__
-
+@xr.register_dataarray_accessor("cartopy")
+class CartPlotAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
 
     @functools.wraps(cartplot)
-    def __call__(self, *args, **kwargs):
-        # The DataArray is passed as the first positional argument
+    def plot(self, *args, **kwargs):
         return cartplot(self._obj, *args, **kwargs)

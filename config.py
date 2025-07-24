@@ -1,8 +1,8 @@
+import os
 import subprocess
+import time
 import warnings
 from pathlib import Path
-import os
-import time
 
 warnings.filterwarnings("ignore")
 
@@ -65,8 +65,7 @@ def eval_pkg_latex():
     with open(pid_file, "r") as f:
         pid_code = f.read().strip()
         print(
-            f"Installing LaTeX... PID: {pid_code}"
-            f" | Estimated time remaining: ~57 minutes. You can continue using the package."
+            f"Installing LaTeX... PID: {pid_code}\nEstimated time remaining: ~57 minutes.\nYou can continue using the package."
         )
 
     return False
