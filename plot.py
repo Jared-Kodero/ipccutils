@@ -253,6 +253,57 @@ def create_map_figure(
     return fig, ax
 
 
+def plot_p_values(
+    ax: plt.Axes,
+    data: xr.DataArray,
+    level: float = 0.05,
+    color: str = "grey",
+    alpha: float = 1,
+    s: float = 1,
+):
+    """
+    Plot p-values on a Cartopy axis.
+
+    Parameters
+    ----------
+    ax : cartopy.mpl.geoaxes.GeoAxesSubplot`
+        The Cartopy axis to plot on.
+    data : xarray.DataArray
+        The data array containing p-values.
+    level : float, optional
+        The significance level to use for plotting. Points with p-values below this level will be plotted
+    color : str, optional
+        Color of the points to plot. Default is "grey".
+    alpha : float, optional
+        Alpha transparency of the points. Default is 0.05.
+    s : float, optional
+        Size of the points to plot. Default is 1.
+    """
+
+    if "lon" not in data.dims or "lat" not in data.dims:
+        raise ValueError("DataArray must contain 'lon' and 'lat' dimensions.")
+
+    # p_values = xr.where(data > level, 1, np.nan)
+
+    p_values = data.to_dataframe(name="p_values").reset_index()
+    p_values = p_values.query("p_values < @level")
+
+    # replace where p_values < 1with NaN pandas
+
+    p_values = p_values.dropna()
+
+    ax.scatter(
+        p_values["lon"],
+        p_values["lat"],
+        transform=ccrs.PlateCarree(),
+        color=color,
+        alpha=alpha,
+        s=s,
+    )
+
+    return ax
+
+
 def cartplot(
     data: xr.DataArray,
     *,
@@ -280,6 +331,7 @@ def cartplot(
     levels: Union[int, list] = None,
     robust: bool = False,
     gridlines: bool = False,
+    add_colorbar: bool = True,
     orientation: Literal["vertical", "horizontal"] = "vertical",
     drawedges: bool = False,
     cbar_label: str = None,
@@ -417,6 +469,7 @@ def cartplot(
     ocean = plot_kwargs.pop("ocean", True)
     land = plot_kwargs.pop("land", True)
     coastlines = plot_kwargs.pop("coastlines", True)
+    add_colorbar = plot_kwargs.pop("add_colorbar", True)
 
     fig, ax = create_map_figure(**map_kwargs)
 
@@ -455,18 +508,19 @@ def cartplot(
         gl.bottom_labels = True
         gl.left_labels = True
 
-    cax = get_cbar_axes(fig=fig, axes=ax, orientation=orientation)
+    if add_colorbar:
+        cax = get_cbar_axes(fig=fig, axes=ax, orientation=orientation)
 
-    cb = plt.colorbar(
-        p,
-        cax=cax,
-        ax=ax,
-        orientation=orientation,
-        drawedges=drawedges,
-    )
+        cb = plt.colorbar(
+            p,
+            cax=cax,
+            ax=ax,
+            orientation=orientation,
+            drawedges=drawedges,
+        )
 
-    if cbar_label:
-        cb.set_label(cbar_label)
+        if cbar_label:
+            cb.set_label(cbar_label)
 
     return (fig, ax, p)
 

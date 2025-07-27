@@ -132,13 +132,14 @@ Notes:
 """
 
 from .colors import ipcc_cmap, set_plot_theme, spine_off
-from .plot import cartplot, create_map_figure, get_cbar_axes
+from .plot import cartplot, create_map_figure, get_cbar_axes, plot_p_values
 
 __all__ = [
-    "set_plot_theme",
-    "ipcc_cmap",
-    "spine_off",
-    "get_cbar_axes",
-    "create_map_figure",
     "cartplot",
+    "create_map_figure",
+    "get_cbar_axes",
+    "ipcc_cmap",
+    "plot_p_values",
+    "set_plot_theme",
+    "spine_off",
 ]
