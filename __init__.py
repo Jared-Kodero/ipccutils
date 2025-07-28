@@ -1,5 +1,5 @@
 """
-ipccutils.py — IPCC-Style Plotting Utilities
+ipccutils — IPCC-Style Plotting Utilities
 ============================================
 
 Description:
