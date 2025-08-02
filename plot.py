@@ -337,7 +337,7 @@ def cartplot(
     cbar_label: str = None,
     states: bool = True,
     borders: bool = True,
-    facecolor: str = "grey",
+    facecolor: str = "#d3d3d3",
     edgecolor: str = "face",
     bbox: tuple[float, float, float, float] = None,
     coastlines: bool = True,
