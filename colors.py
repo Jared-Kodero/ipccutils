@@ -14,6 +14,11 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap, to_hex
 
 from .config import SCRIPT_DIR, eval_pkg_latex
 
+if "ipykernel" in sys.modules:
+    import matplotlib_inline as plt_inline
+
+    plt_inline.backend_inline.set_matplotlib_formats("retina")
+
 LATEX_INSTALLED = eval_pkg_latex()
 
 
@@ -64,11 +69,6 @@ def set_plot_theme(
         fig_size = (7.09, 4.38)  # Double-column (18 cm × 11.12 cm)
     else:
         fig_size = None
-
-    if "ipykernel" in sys.modules:
-        import matplotlib_inline as plt_inline
-
-        plt_inline.backend_inline.set_matplotlib_formats("retina")
 
     if latex and not LATEX_INSTALLED:
         latex = False

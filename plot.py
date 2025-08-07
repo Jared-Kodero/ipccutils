@@ -307,6 +307,8 @@ def plot_p_values(
 def cartplot(
     data: xr.DataArray,
     *,
+    x=None,
+    y=None,
     plot_type: Literal[
         "default", "pcolormesh", "contourf", "contour", "imshow"
     ] = "default",
@@ -351,6 +353,10 @@ def cartplot(
     ----------
     data : xr.DataArray
         The 2D data to plot. Should contain spatial dimensions (e.g., lat/lon or x/y).
+    x : str or None, optional
+        Name of the x dimension. If None, uses the first dimension of the DataArray.
+    y : str or None, optional
+        Name of the y dimension. If None, uses the second dimension of the DataArray.
 
     map_type : {"pcolormesh", "contourf", "contour", "imshow"}, optional
         The type of plot to generate. If None, defaults to `DataArray.plot()` behavior.
