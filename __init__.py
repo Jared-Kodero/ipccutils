@@ -59,72 +59,7 @@ Main Features:
 >>> fig, ax = create_map_figure(figsize=(10, 6))
     # Create a matplotlib figure suitable for geospatial plotting
 
-4. CartoPy Plotting
--------------------
 
->>> import numpy as np
->>> import xarray as xr
->>> da = xr.DataArray(
-        np.random.rand(10, 10),
-        dims=["lat", "lon"],
-        coords={"lat": np.linspace(-90, 90, 10), "lon": np.linspace(-180, 180, 10)}
-    )
-
->>> cartplot(
-        data=da,
-        plot_type="default",            # or 'pcolormesh', 'contour', 'contourf'
-        projection="PlateCarree",       # Cartopy projection name or object
-        central_longitude=0.0,          # Longitude for central meridian
-        global_extent=True,             # Whether to use a global extent
-        figsize=(12, 6),                # Figure size
-        cmap="balance",                 # Colormap
-        vmin=None,                      # Min value for colormap
-        vmax=None,                      # Max value for colormap
-        levels=None,                    # Contour levels
-        robust=False,                   # Whether to ignore extreme percentiles
-        gridlines=True,                 # Toggle gridlines
-        orientation="horizontal",       # Orientation of colorbar
-        drawedges=False,                # Draw colorbar edges
-        cbar_label="Example Units",     # Colorbar label
-        states=True,                    # Draw internal state borders
-        borders=True,                   # Draw country borders
-        facecolor="lightgrey",          # Background color of the map
-        edgecolor="face",               # Edge color for map patches
-        bbox=None,                      # Tuple: (lon_min, lon_max, lat_min, lat_max)
-        coastlines=True,                # Draw coastlines
-        ocean=True,                     # Show ocean features
-        land=True                       # Show land features
-    )
-
-# Alternatively, use method from xarray.DataArray directly:
->>> da.cartopy.plot(
-        plot_type="default",
-        projection="PlateCarree",
-        central_longitude=0.0,
-        global_extent=True,
-        figsize=(12, 6),
-        cmap="balance",
-        vmin=None,
-        vmax=None,
-        levels=None,
-        robust=False,
-        gridlines=True,
-        orientation="horizontal",
-        drawedges=False,
-        cbar_label="Example Units",
-        states=True,
-        borders=True,
-        facecolor="lightgrey",
-        edgecolor="face",
-        bbox=None,
-        coastlines=True,
-        ocean=True,
-        land=True
-    )
-
-Notes:
-------
-- `data` is required in `cartplot` and must be a 2D `xarray.DataArray` with latitude and longitude dimensions.
 - All other arguments are optional and can be used for extensive customization.
 - Designed to produce figures consistent with IPCC WG-style reports.
 - Use the provided colormap methods (`adjust`, `blend`) to match your data scale and color symmetry needs.
@@ -132,14 +67,9 @@ Notes:
 """
 
 from .colors import ipcc_cmap, set_plot_theme, spine_off
-from .plot import cartplot, create_map_figure, get_cbar_axes, plot_p_values
 
 __all__ = [
-    "cartplot",
-    "create_map_figure",
-    "get_cbar_axes",
     "ipcc_cmap",
-    "plot_p_values",
     "set_plot_theme",
     "spine_off",
 ]
