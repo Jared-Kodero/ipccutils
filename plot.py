@@ -358,24 +358,20 @@ def _animate(
         kwargs["data"] = da
         fig, _, _ = cartplot(**kwargs)
         fname = session_tmp_dir / f"{i:06d}.png"
-        print(dpi)
         plt.savefig(fname, dpi=dpi, bbox_inches="tight")
         plt.close(fig)
         return None
 
-    if indices is not None:
-        if indices == -1:
+    if values is None:
+        if indices is None:
             indices = range(data.sizes[dim])
 
         for i, v in enumerate(indices):
             _update(data.isel({dim: v}), v)
 
-    elif values is not None:
+    else:
         for i, v in enumerate(values):
             _update(data.sel({dim: v}), i)
-
-    else:
-        raise ValueError("Specify either indices or values for animation.")
 
     # ---- ffmpeg encode (MP4 only) ----
 
