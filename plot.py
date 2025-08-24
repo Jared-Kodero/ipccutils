@@ -1,4 +1,10 @@
 import functools
+import shutil
+import subprocess
+import sys
+import tempfile
+from os import PathLike
+from pathlib import Path
 from typing import Literal, Union
 
 import cartopy.crs as ccrs
@@ -304,6 +310,139 @@ def plot_p_values(
     return ax
 
 
+# wrap cartplot's signature & docstring
+
+
+def _animate(
+    args,
+):
+
+    kwargs = locals().copy()
+    kwargs = kwargs["args"]
+    data = kwargs["data"]  # first positional arg must be the DataArray
+    dim = kwargs["animate_dim"]
+    values = kwargs["animate_values"]
+    indices = kwargs["animate_indices"]
+    fps = kwargs["animate_fps"]
+    quality = kwargs["animate_quality"]
+    out_file = kwargs["animate_out_file"]
+
+    del kwargs["data"]
+    del kwargs["animate_dim"]
+    del kwargs["animate_values"]
+    del kwargs["animate_indices"]
+    del kwargs["animate_fps"]
+    del kwargs["animate_quality"]
+    del kwargs["animate_out_file"]
+    del kwargs["animate"]
+
+    if not isinstance(data, xr.DataArray):
+        raise TypeError(f"Expected xarray.DataArray, got {type(data)}")
+
+    if dim not in data.dims:
+        raise ValueError(f"{dim} not found in data.dims {data.dims}")
+
+    if indices and values:
+        raise ValueError("Specify only one of indices or values, not both.")
+
+    session_tmp_dir = Path(tempfile.mkdtemp())
+
+    if quality == "low":
+        dpi = 300
+    elif quality == "medium":
+        dpi = 600
+    elif quality == "high":
+        dpi = 1200
+
+    def _update(da, i):
+        kwargs["data"] = da
+        fig, _, _ = cartplot(**kwargs)
+        fname = session_tmp_dir / f"{i:06d}.png"
+        print(dpi)
+        plt.savefig(fname, dpi=dpi, bbox_inches="tight")
+        plt.close(fig)
+        return None
+
+    if indices is not None:
+        if indices == -1:
+            indices = range(data.sizes[dim])
+
+        for i, v in enumerate(indices):
+            _update(data.isel({dim: v}), v)
+
+    elif values is not None:
+        for i, v in enumerate(values):
+            _update(data.sel({dim: v}), i)
+
+    else:
+        raise ValueError("Specify either indices or values for animation.")
+
+    # ---- ffmpeg encode (MP4 only) ----
+
+    out_file = Path(out_file) if out_file else Path("animation.mp4")
+    out_file = out_file.with_suffix(".mp4")
+
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    input_pattern = str(Path(session_tmp_dir) / "%06d.png")
+
+    error = 0
+
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(fps),
+            "-i",
+            input_pattern,
+            "-vf",
+            "scale=1920:1080, pad=iw+mod(iw\\,2):ih+mod(ih\\,2), format=yuv420p",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "slow",
+            "-crf",
+            "16",
+            "-profile:v",
+            "high",
+            "-tune",
+            "animation",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            out_file,
+        ]
+
+        subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        error = 1
+        print("ERROR:", e.stderr)
+    finally:
+        shutil.rmtree(session_tmp_dir, ignore_errors=True)
+
+    # optional inline display (Jupyter)
+    if "ipykernel" in sys.modules and error == 0:
+        from IPython.display import Video, display
+
+        return display(
+            Video(
+                out_file,
+                embed=True,
+                html_attributes="controls autoplay loop",
+                width=800,
+                height=600,
+            )
+        )
+    else:
+        return None
+
+
 def cartplot(
     data: xr.DataArray,
     *,
@@ -345,6 +484,13 @@ def cartplot(
     coastlines: bool = True,
     ocean: bool = True,
     land: bool = True,
+    animate: bool = False,
+    animate_dim: str = "time",
+    animate_indices: tuple = None,
+    animate_values: tuple = None,
+    animate_out_file: PathLike = None,
+    animate_quality: Literal["low", "medium", "high"] = "medium",
+    animate_fps=10,
 ):
     """
     Plot an xarray DataArray on a Cartopy map using the specified projection and plot type.
@@ -429,6 +575,24 @@ def cartplot(
     land : bool, default: True
         If True, displays land features.
 
+    animate_dim : str, default: "time"
+        The dimension along which to create the animation.
+
+    animate_values : list of float
+        The values to animate over the specified dimension.
+
+    animate_indices : list of int
+        The indices of the values to animate.
+
+    animate_out_file : str = None
+        The output file for the animation.
+
+    animate_fps : int, default: 10
+        The frames per second for the animation.
+
+    animate_quality : {"low", "medium", "high"}, default: "medium"
+        The quality of the animation.
+
     Returns
     -------
     fig : matplotlib.figure.Figure
@@ -449,6 +613,10 @@ def cartplot(
     """
 
     allargs = locals()
+
+    if animate:
+        return _animate(allargs)
+
     map_keys = (
         "projection",
         "figsize",
@@ -476,6 +644,27 @@ def cartplot(
     land = plot_kwargs.pop("land", True)
     coastlines = plot_kwargs.pop("coastlines", True)
     add_colorbar = plot_kwargs.pop("add_colorbar", True)
+    animate = plot_kwargs.pop("animate", False)
+    animate_out_file = plot_kwargs.pop("animate_out_file", None)
+    animate_fps = plot_kwargs.pop("animate_fps", 10)
+    animate_dim = plot_kwargs.pop("animate_dim", "time")
+    animate_values = plot_kwargs.pop("animate_values", None)
+    animate_indices = plot_kwargs.pop("animate_indices", None)
+    animate_quality = plot_kwargs.pop("animate_quality", "medium")
+
+    if bbox:
+        # Normalize possible dim names
+        lat_names = ["lat", "latitude"]
+        lon_names = ["lon", "longitude"]
+        # Find matching dimension names
+        lat_dim = next((name for name in lat_names if name in data.dims), None)
+        lon_dim = next((name for name in lon_names if name in data.dims), None)
+
+        if lat_dim and lon_dim:
+            # Slice only if both lat/lon exist
+            data = data.sel(
+                {lat_dim: slice(bbox[1], bbox[3]), lon_dim: slice(bbox[0], bbox[2])}
+            )
 
     fig, ax = create_map_figure(**map_kwargs)
 
@@ -527,6 +716,15 @@ def cartplot(
 
         if cbar_label:
             cb.set_label(cbar_label)
+
+        else:
+
+            cbar_label = []
+            if "long_name" in data.attrs:
+                cbar_label.append(data.attrs["long_name"])
+            if "units" in data.attrs:
+                cbar_label.append(data.attrs["units"])
+            cb.set_label("\n".join(cbar_label))
 
     return (fig, ax, p)
 
